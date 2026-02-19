@@ -88,18 +88,18 @@ def predict_flight_risk(origin, dest, date_obj, time_obj):
     week_of_year = date_obj.isocalendar()[1]
     month, day_of_week = date_obj.month, date_obj.weekday()
     
-    # Lógica de Feriados do Notebook FE
+    # 1. Holiday Logic
     is_holiday = 1 if date_obj in holidays else 0
     is_near_holiday = 1 if any(abs((h - date_obj).days) <= 3 for h in holidays) else 0
 
-    # Ciclos Trigonométricos
+    # 2. Cyclical Transforms
     hour_sin, hour_cos = np.sin(2 * np.pi * sched_hour / 24), np.cos(2 * np.pi * sched_hour / 24)
     month_sin, month_cos = np.sin(2 * np.pi * month / 12), np.cos(2 * np.pi * month / 12)
     day_sin, day_cos = np.sin(2 * np.pi * day_of_week / 7), np.cos(2 * np.pi * day_of_week / 7)
 
     distance = dist_lookup.get((origin.lower(), dest.lower()), 800)
     
-    # Criando as 20 colunas exatas exigidas pelo Encoder
+    # 3. Create the Base DataFrame (Must match the Encoder's expected input)
     input_df = pd.DataFrame([{
         'distance': float(distance),
         'week_of_year': int(week_of_year),
@@ -116,22 +116,41 @@ def predict_flight_risk(origin, dest, date_obj, time_obj):
         'tail_number': 'UNKNOWN',
         'operating_airline': 'UNKNOWN',
         'deptimeblk': f"{sched_hour:02d}00-{sched_hour:02d}59",
-        'distance_category': 'medium', # Coluna 19
-        'is_morning': 1 if 5 <= sched_hour <= 11 else 0 # Coluna 20
+        'distance_category': 'medium', 
+        'crselapsedtime': 120.0 # Adding the missing field the model wants
     }])
 
-    # 1. Aplicar Target Encoder
+    # 4. Step 1: Target Encoding
     input_encoded = encoder.transform(input_df)
-    
-    # 2. Limpeza de tipos de dados para o XGBoost
-    input_final = input_encoded.select_dtypes(include=['number'])
 
-    # 3. Aplicar Scaler
+    # 5. Step 2: Scale numeric features
     num_cols = ['distance', 'week_of_year', 'month_sin', 'month_cos', 'dayofweek_sin', 
                 'dayofweek_cos', 'hour_sin', 'hour_cos', 'is_weekend', 'is_holiday', 'is_near_holiday', 'dep_hour']
-    input_final.loc[:, num_cols] = scaler.transform(input_final[num_cols])
+    input_encoded[num_cols] = scaler.transform(input_encoded[num_cols])
+
+    # 6. Step 3: MANUALLY ALIGN COLUMNS FOR XGBOOST
+    # We create the specific dummy variables the model expects
+    input_encoded['distance_category_medium'] = 1.0
+    input_encoded['distance_category_long'] = 0.0
+    input_encoded['distance_category_ultra_long'] = 0.0
+
+    # 7. Final Column Selection & Ordering (MATCHING THE ERROR MESSAGE EXACTLY)
+    xgb_expected_order = [
+        'operating_airline', 'tail_number', 'origin', 'dest', 'deptimeblk', 
+        'crselapsedtime', 'distance', 'dep_hour', 'airport_route', 'is_weekend', 
+        'week_of_year', 'is_holiday', 'is_near_holiday', 'month_sin', 'month_cos', 
+        'dayofweek_sin', 'dayofweek_cos', 'hour_sin', 'hour_cos', 
+        'distance_category_medium', 'distance_category_long', 'distance_category_ultra_long'
+    ]
     
-    # 4. Predição Calibrada
+    # Ensure all columns exist, fill with 0 if missing
+    for col in xgb_expected_order:
+        if col not in input_encoded.columns:
+            input_encoded[col] = 0
+
+    input_final = input_encoded[xgb_expected_order]
+
+    # 8. Prediction
     prob = model.predict_proba(input_final)[:, 1][0]
     avg_delay = traffic_stats['route_means'].get(f"{origin}_{dest}", 15)
     
