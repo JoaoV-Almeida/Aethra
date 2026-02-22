@@ -1,3 +1,24 @@
-venv
-seasonal_route_stats.pkl
+# Virtual environment
+venv/
+.venv/
+
+# Secrets (API keys)
+.streamlit/secrets.toml
 secrets.toml
+
+# Large data files not needed at runtime
+data/dataset_flights.csv
+seasonal_route_stats.pkl
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+Thumbs.db
+.DS_Store

@@ -31,7 +31,8 @@ st.set_page_config(page_title="Flight Risk AI", page_icon="✈️", layout="wide
 # ------------------------
 @st.cache_resource
 def load_ml_pipeline():
-    TARGET_DIR = r"C:\Users\win\Desktop\Project-X\flight_risk_app"
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    TARGET_DIR = os.path.join(BASE_DIR, "flight_risk_app")
     
     try:
         model = joblib.load(os.path.join(TARGET_DIR, "flight_risk_model.pkl"))
@@ -53,7 +54,8 @@ def load_ml_pipeline():
 
 @st.cache_data
 def load_airport_db():
-    AIRPORTS_PATH = r"C:\Users\win\Desktop\Project-X\data\airports.json"
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    AIRPORTS_PATH = os.path.join(BASE_DIR, "data", "airports.json")
     try:
         with open(AIRPORTS_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
