@@ -315,39 +315,43 @@ elif st.session_state.current_view == "details":
         st.subheader(f"🤖 Concierge Chat ({persona.get('label')})")
         
         # 1. Initialize the Chat Session and the Auto-Greeting
-        if "gemini_chat" not in st.session_state:
-            st.session_state.gemini_chat = llm_model.start_chat(history=[])
-            
-            insurance_data = persona.get('insurance', {})
-            
-            # The secret system prompt that kicks off the chat
-            initial_prompt = f"""
-            You are the AI Flight Risk Concierge. 
-            Traveler Archetype: {persona.get('label')}
-            Tone Instruction: {persona.get('tone')}
+        if llm_model:
+            if "gemini_chat" not in st.session_state:
+                st.session_state.gemini_chat = llm_model.start_chat(history=[])
+                
+                insurance_data = persona.get('insurance', {})
+                
+                # The secret system prompt that kicks off the chat
+                initial_prompt = f"""
+                You are the AI Flight Risk Concierge. 
+                Traveler Archetype: {persona.get('label')}
+                Tone Instruction: {persona.get('tone')}
 
-            Flight Situation: {prob}% delay risk ({status_level}). {flight['origin']} to {flight['dest']} on {flight['airline']}.
-            
-            Psychology: 
-            - Opportunity Cost: {persona.get('opportunity_cost')}
-            - Behavior: {persona.get('customer_behavior')}
-            - Preferences: {persona.get('flight_preferences')}
-            - Coping Style: {persona.get('coping_style')}
+                Flight Situation: {prob}% delay risk ({status_level}). {flight['origin']} to {flight['dest']} on {flight['airline']}.
+                
+                Psychology: 
+                - Opportunity Cost: {persona.get('opportunity_cost')}
+                - Behavior: {persona.get('customer_behavior')}
+                - Preferences: {persona.get('flight_preferences')}
+                - Coping Style: {persona.get('coping_style')}
 
-            Task: Actively introduce yourself to the traveler in character. 
-            Provide:
-            1. A brief assessment of the {prob}% delay risk.
-            2. Immediate advice on what they should do right now.
-            3. A seamless pitch for "{insurance_data.get('name')}" using this exact logic: "{insurance_data.get('recommendation_logic')}".
-            Ask them if they need any alternative flights or lounge info!
-            """
-            
-            with st.spinner("Concierge is preparing your strategy..."):
-                try:
-                    response = st.session_state.gemini_chat.send_message(initial_prompt)
-                    st.session_state.messages.append({"role": "assistant", "content": response.text})
-                except Exception as e:
-                    st.error(f"API Error: {e}")
+                Task: Actively introduce yourself to the traveler in character. 
+                Provide:
+                1. A brief assessment of the {prob}% delay risk.
+                2. Immediate advice on what they should do right now.
+                3. A seamless pitch for "{insurance_data.get('name')}" using this exact logic: "{insurance_data.get('recommendation_logic')}".
+                Ask them if they need any alternative flights or lounge info!
+                """
+                
+                with st.spinner("Concierge is preparing your strategy..."):
+                    try:
+                        response = st.session_state.gemini_chat.send_message(initial_prompt)
+                        st.session_state.messages.append({"role": "assistant", "content": response.text})
+                    except Exception as e:
+                        st.error(f"API Error: {e}")
+        else:
+            if not st.session_state.messages:
+                st.session_state.messages.append({"role": "assistant", "content": "⚠️ **AI Assistant Offline**: To enable the concierge chat, please configure your Gemini API key in the app settings/secrets."})
 
         # 2. Render Chat History in a clean container
         chat_container = st.container(height=450)
@@ -357,7 +361,7 @@ elif st.session_state.current_view == "details":
                     st.markdown(message["content"])
 
         # 3. Chat Input Box (The user talks back)
-        if user_query := st.chat_input("Ask your concierge a question..."):
+        if user_query := st.chat_input("Ask your concierge a question...", disabled=(llm_model is None)):
             
             # Show user message instantly
             st.session_state.messages.append({"role": "user", "content": user_query})
