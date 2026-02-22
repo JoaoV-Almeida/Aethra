@@ -27,9 +27,7 @@ if api_key:
         st.error(f"❌ Error configuring Gemini API: {e}")
         llm_model = None
 else:
-    # Debug info:
-    available_keys = list(st.secrets.to_dict().keys())
-    st.warning(f"⚠️ Gemini API key not found. Available secret keys: {available_keys}")
+    st.warning("⚠️ Gemini API key not configured. AI Concierge is disabled.")
     llm_model = None
 
 # ------------------------
